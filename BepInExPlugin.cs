@@ -17,7 +17,7 @@ namespace ConfigurationManager
     /// <summary>
     /// An easy way to let user configure how a plugin behaves without the need to make your own GUI. The user can change any of the settings you expose, even keyboard shortcuts.
     /// </summary>
-    [BepInPlugin(GUID, "Valheim Configuration Manager", "0.6.1")]
+    [BepInPlugin(GUID, "Valheim Configuration Manager", "0.6.2")]
     public class BepInExPlugin : BaseUnityPlugin
     {
         /// <summary>
