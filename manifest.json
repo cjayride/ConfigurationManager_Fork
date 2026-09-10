@@ -1,0 +1,9 @@
+{
+    "name": "ConfigurationManager",
+    "version_number": "0.6.0",
+    "website_url": "https://github.com/cjayride/ConfigurationManager_Fork",
+    "description": "Fork of aedenthorn's Configuration Manager. Edit BepInEx mod configs in game. Updated for Valheim 1.0.",
+    "dependencies": [
+		"denikson-BepInExPack_Valheim-5.4.2350"
+    ]
+}
