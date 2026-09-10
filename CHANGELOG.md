@@ -1,3 +1,6 @@
+# v0.6.1
+- Restored a usable default window size on Valheim 1.0 (Unity 6 was saving ~300x200 because Screen size is not ready in the plugin constructor)
+
 # v0.6.0
 - Updated for Valheim 1.0 (Unity 6)
 - BepInEx dependency updated to denikson-BepInExPack_Valheim-5.4.2350

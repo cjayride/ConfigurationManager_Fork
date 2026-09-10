@@ -17,7 +17,7 @@ namespace ConfigurationManager
     /// <summary>
     /// An easy way to let user configure how a plugin behaves without the need to make your own GUI. The user can change any of the settings you expose, even keyboard shortcuts.
     /// </summary>
-    [BepInPlugin(GUID, "Valheim Configuration Manager", "0.6.0")]
+    [BepInPlugin(GUID, "Valheim Configuration Manager", "0.6.1")]
     public class BepInExPlugin : BaseUnityPlugin
     {
         /// <summary>
@@ -125,6 +125,11 @@ namespace ConfigurationManager
         public static GUIStyle pluginHeaderSkin;
         public static int fontSize = 14;
 
+        public const float MinWindowWidth = 600f;
+        public const float MinWindowHeight = 480f;
+        public const float PreferredWindowWidth = 650f;
+        public const float PreferredWindowHeight = 800f;
+
         /// <inheritdoc />
         public BepInExPlugin()
         {
@@ -160,7 +165,7 @@ namespace ConfigurationManager
 
             _pluginConfigCollapsedDefault = Config.Bind("General", "Plugin collapsed default", true, new ConfigDescription("If set to true plugins will be collapsed when opening the configuration manager window"));
             _windowPosition = Config.Bind("General", "WindowPosition", new Vector2(55, 35), "Window position");
-            _windowSize = Config.Bind("General", "WindowSize", DefaultWindowRect.size, "Window size");
+            _windowSize = Config.Bind("General", "WindowSize", new Vector2(PreferredWindowWidth, PreferredWindowHeight), "Window size");
             _textSize = Config.Bind("General", "FontSize", 14, "Font Size");
             _windowBackgroundColor = Config.Bind("Colors", "WindowBackgroundColor", new Color(0, 0, 0, 1), "Window background color");
             _entryBackgroundColor = Config.Bind("Colors", "EntryBackgroundColor", new Color(0.557f, 0.502f, 0.502f, 0.871f), "Entry background color");
@@ -168,6 +173,7 @@ namespace ConfigurationManager
             _widgetBackgroundColor = Config.Bind("Colors", "WidgetColor", new Color(0.882f, 0.463f, 0, 0.749f), "Widget color");
 
             currentWindowRect = new Rect(_windowPosition.Value, _windowSize.Value);
+            EnsureUsableWindowRect();
 
             Patches.ApplyPatches();
         }
@@ -192,22 +198,29 @@ namespace ConfigurationManager
                 GUI.Box(currentWindowRect, GUIContent.none, new GUIStyle());
                 GUI.backgroundColor = _windowBackgroundColor.Value;
 
-                if(_windowSize.Value.x > 200 && _windowSize.Value.x < Screen.width && _windowSize.Value.y > 200 && _windowSize.Value.y < Screen.height)
-                    currentWindowRect.size = _windowSize.Value;
+                EnsureUsableWindowRect();
+                currentWindowRect.size = _windowSize.Value;
 
                 RightColumnWidth = Mathf.RoundToInt(currentWindowRect.width / 2.5f * fontSize / 12f);
                 LeftColumnWidth = Mathf.RoundToInt(currentWindowRect.width - RightColumnWidth - 115);
 
-
-                currentWindowRect = GUILayout.Window(WindowId, currentWindowRect, SettingsWindow, _windowTitle.Value, windowStyle);
+                currentWindowRect = GUILayout.Window(WindowId, currentWindowRect, SettingsWindow, _windowTitle.Value, windowStyle,
+                    GUILayout.Width(currentWindowRect.width), GUILayout.Height(currentWindowRect.height));
+                currentWindowRect.size = _windowSize.Value;
 
                 if (!SettingFieldDrawer.SettingKeyboardShortcut)
                     Input.ResetInputAxes();
 
-                if (!Input.GetKey(KeyCode.Mouse0) && (currentWindowRect.x != _windowPosition.Value.x || currentWindowRect.y != _windowPosition.Value.y))
+                if (!Input.GetKey(KeyCode.Mouse0))
                 {
-                    _windowPosition.Value = currentWindowRect.position;
-                    Config.Save();
+                    bool changed = false;
+                    if (currentWindowRect.x != _windowPosition.Value.x || currentWindowRect.y != _windowPosition.Value.y)
+                    {
+                        _windowPosition.Value = currentWindowRect.position;
+                        changed = true;
+                    }
+                    if (changed)
+                        Config.Save();
                 }
             }
         }
@@ -515,6 +528,7 @@ namespace ConfigurationManager
                 if (_displayingWindow)
                 {
                     CalculateDefaultWindowRect();
+                    EnsureUsableWindowRect();
 
                     BuildSettingList();
 
@@ -635,16 +649,55 @@ namespace ConfigurationManager
 
         public void CalculateDefaultWindowRect()
         {
-            var width = Mathf.Min(Screen.width, 650);
-            var height = Screen.height < 800 ? Screen.height : 800;
-            var offsetX = Mathf.RoundToInt((Screen.width - width) / 2f);
-            var offsetY = Mathf.RoundToInt((Screen.height - height) / 2f);
+            float screenW = Screen.width > 100 ? Screen.width : 1920f;
+            float screenH = Screen.height > 100 ? Screen.height : 1080f;
+            float width = Mathf.Clamp(PreferredWindowWidth, MinWindowWidth, Mathf.Max(MinWindowWidth, screenW - 40f));
+            float height = Mathf.Clamp(PreferredWindowHeight, MinWindowHeight, Mathf.Max(MinWindowHeight, screenH - 40f));
+            var offsetX = Mathf.RoundToInt((screenW - width) / 2f);
+            var offsetY = Mathf.RoundToInt((screenH - height) / 2f);
             DefaultWindowRect = new Rect(offsetX, offsetY, width, height);
 
-            _screenRect = new Rect(0, 0, Screen.width, Screen.height);
+            _screenRect = new Rect(0, 0, screenW, screenH);
 
             LeftColumnWidth = Mathf.RoundToInt(DefaultWindowRect.width / 2.5f);
             RightColumnWidth = (int)DefaultWindowRect.width - LeftColumnWidth - 115;
+        }
+
+        public void EnsureUsableWindowRect()
+        {
+            CalculateDefaultWindowRect();
+
+            var size = _windowSize.Value;
+            bool sizeChanged = false;
+            if (size.x < MinWindowWidth || size.y < MinWindowHeight)
+            {
+                size = DefaultWindowRect.size;
+                sizeChanged = true;
+            }
+
+            float screenW = _screenRect.width;
+            float screenH = _screenRect.height;
+            float maxW = Mathf.Max(MinWindowWidth, screenW - 40f);
+            float maxH = Mathf.Max(MinWindowHeight, screenH - 40f);
+            float clampedX = Mathf.Min(size.x, maxW);
+            float clampedY = Mathf.Min(size.y, maxH);
+            if (clampedX != size.x || clampedY != size.y)
+            {
+                size.x = clampedX;
+                size.y = clampedY;
+                sizeChanged = true;
+            }
+            if (sizeChanged)
+                _windowSize.Value = size;
+
+            var pos = _windowPosition.Value;
+            var clampedPos = new Vector2(
+                Mathf.Clamp(pos.x, 0f, Mathf.Max(0f, screenW - size.x)),
+                Mathf.Clamp(pos.y, 0f, Mathf.Max(0f, screenH - size.y)));
+            if (clampedPos != pos)
+                _windowPosition.Value = clampedPos;
+
+            currentWindowRect = new Rect(_windowPosition.Value, _windowSize.Value);
         }
 
         public static void DrawTooltip(Rect area)
